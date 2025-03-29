@@ -1,10 +1,21 @@
 ---
-description: Commit rules
+description: commit rules
 globs: 
 alwaysApply: false
 ---
 
 # Commit rules
 
-- Use Conventional Commits
-- Вывод на русскод языке
+## Structure
+
+The commit message should be structured as follows:
+
+<type>: <description>
+
+[optional body]
+
+[optional footer(s)]
+
+## Language
+
+Description, body and optional footer write on Russian
