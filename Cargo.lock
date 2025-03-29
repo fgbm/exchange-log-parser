@@ -379,6 +379,7 @@ dependencies = [
  "env_logger",
  "lazy_static",
  "log",
+ "postgres",
  "postgres-types",
  "regex",
  "serde",
@@ -755,6 +756,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "postgres"
+version = "0.19.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "363e6dfbdd780d3aa3597b6eb430db76bb315fa9bad7fae595bb8def808b8470"
+dependencies = [
+ "bytes",
+ "fallible-iterator",
+ "futures-util",
+ "log",
+ "tokio",
+ "tokio-postgres",
+]
+
+[[package]]
 name = "postgres-derive"
 version = "0.4.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -791,6 +806,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "613283563cd90e1dfc3518d548caee47e0e725455ed619881f5cf21f36de4b48"
 dependencies = [
  "bytes",
+ "chrono",
  "fallible-iterator",
  "postgres-derive",
  "postgres-protocol",
