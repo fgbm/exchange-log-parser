@@ -3,13 +3,12 @@ name: Release
 on:
   push:
     tags:
-      - 'v*'
+      - "v*"
 
 permissions:
-  contents: write # Needed to create releases and upload assets
+  contents: write
 
 env:
-  # Replace with your actual binary name if different
   BINARY_NAME: exchange-log-parser
 
 jobs:
@@ -20,123 +19,55 @@ jobs:
       upload_url: ${{ steps.create_release.outputs.upload_url }}
       release_tag: ${{ steps.get_tag.outputs.TAG }}
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # Needed for git-cliff to analyze history
+          fetch-depth: 0
 
-      - name: Generate Changelog using git-cliff action
+      - name: Generate Changelog
         uses: orhun/git-cliff-action@v3
         with:
-          # Arguments passed to git-cliff command
           args: --latest --strip header -o CHANGELOG.md
-        # Optional: Define environment variables if needed by git-cliff or your config
-        # env:
-        #   SOME_VAR: value
 
       - name: Get tag name
         id: get_tag
-        # Extracts the tag name from the GITHUB_REF
         run: echo "TAG=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
-        shell: bash
 
-      - name: Create GitHub Release
+      - name: Create Release
         id: create_release
         uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ steps.get_tag.outputs.TAG }}
           name: Release ${{ steps.get_tag.outputs.TAG }}
-          body_path: CHANGELOG.md # Uses the generated changelog as release notes
-          draft: false      # Set to true if you want to manually review before publishing
-          prerelease: false # Set to true if this is a pre-release
-        env:
-          # This token is automatically provided by GitHub Actions
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          body_path: CHANGELOG.md
+          draft: false
+          prerelease: false
 
   build-release-assets:
     name: Build Release Assets
-    needs: create-release # This job runs only after create-release is successful
+    needs: create-release
     strategy:
       matrix:
-        include:
-          # Linux x86_64 GNU target
-          - target: x86_64-unknown-linux-gnu
-            os: ubuntu-latest
-            artifact_suffix: linux-amd64
-            archive_cmd: | # Creates a tar.gz archive
-              tar czvf ../${{ env.BINARY_NAME }}-${{ needs.create-release.outputs.release_tag }}-${{ matrix.artifact_suffix }}.tar.gz ${{ env.BINARY_NAME }}
-            binary_name: ${{ env.BINARY_NAME }}
-            asset_content_type: application/gzip
-
-          # Windows x86_64 GNU target (MinGW)
-          # Use x86_64-pc-windows-msvc if you prefer/need the MSVC toolchain
-          - target: x86_64-pc-windows-gnu
-            os: windows-latest
-            artifact_suffix: windows-amd64
-            archive_cmd: | # Creates a zip archive using 7zip (pre-installed on windows runners)
-              7z a ../${{ env.BINARY_NAME }}-${{ needs.create-release.outputs.release_tag }}-${{ matrix.artifact_suffix }}.zip ${{ env.BINARY_NAME }}.exe
-            binary_name: ${{ env.BINARY_NAME }}.exe
-            asset_content_type: application/zip
-
-          # macOS x86_64 target
-          - target: x86_64-apple-darwin
-            os: macos-latest
-            artifact_suffix: macos-amd64
-            archive_cmd: | # Creates a tar.gz archive
-              tar czvf ../${{ env.BINARY_NAME }}-${{ needs.create-release.outputs.release_tag }}-${{ matrix.artifact_suffix }}.tar.gz ${{ env.BINARY_NAME }}
-            binary_name: ${{ env.BINARY_NAME }}
-            asset_content_type: application/gzip
-
-          # --- Add other targets as needed below ---
-          # Example for Linux ARM64 (requires cross-compilation setup or a different runner)
-          # - target: aarch64-unknown-linux-gnu
-          #   os: ubuntu-latest # Needs additional setup for cross-compilation
-          #   artifact_suffix: linux-arm64
-          #   archive_cmd: |
-          #     tar czvf ../${{ env.BINARY_NAME }}-${{ needs.create-release.outputs.release_tag }}-${{ matrix.artifact_suffix }}.tar.gz ${{ env.BINARY_NAME }}
-          #   binary_name: ${{ env.BINARY_NAME }}
-          #   asset_content_type: application/gzip
-
+        os: [ubuntu-latest, windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          # Installs the specific target for the current matrix job
-          targets: ${{ matrix.target }}
-
-      # Consider adding caching for dependencies here to speed up builds
-      # - name: Cache dependencies
-      #   uses: Swatinem/rust-cache@v2
+      - uses: dtolnay/rust-toolchain@stable
 
       - name: Build binary
-        # Используем actions-rs/cargo для сборки
-        uses: actions-rs/cargo@v1
-        with:
-          command: build
-          args: --release --target ${{ matrix.target }}
+        run: cargo build --release
 
       - name: Prepare artifact
         run: |
-          # Navigate to the directory where the binary was built
-          cd target/${{ matrix.target }}/release
-          # Run the appropriate archiving command based on the OS
-          ${{ matrix.archive_cmd }}
-        shell: bash
+          if [ "${{ matrix.os }}" == "windows-latest" ]; then
+            7z a ${{ env.BINARY_NAME }}-${{ needs.create-release.outputs.release_tag }}-${{ runner.os }}.zip target/release/${{ env.BINARY_NAME }}.exe
+          else
+            tar czvf ${{ env.BINARY_NAME }}-${{ needs.create-release.outputs.release_tag }}-${{ runner.os }}.tar.gz -C target/release ${{ env.BINARY_NAME }}
+          fi
 
       - name: Upload Release Asset
         uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          # URL for uploading provided by the create-release job
           upload_url: ${{ needs.create-release.outputs.upload_url }}
-          # Path to the created archive
-          asset_path: ./target/${{ matrix.target }}/${{ env.BINARY_NAME }}-${{ needs.create-release.outputs.release_tag }}-${{ matrix.artifact_suffix }}${{ matrix.os == 'windows-latest' && '.zip' || '.tar.gz' }}
-          # Name of the asset file on GitHub Releases
-          asset_name: ${{ env.BINARY_NAME }}-${{ needs.create-release.outputs.release_tag }}-${{ matrix.artifact_suffix }}${{ matrix.os == 'windows-latest' && '.zip' || '.tar.gz' }}
-          # Content type of the asset (zip or gzip)
-          asset_content_type: ${{ matrix.asset_content_type }}
+          asset_path: ${{ env.BINARY_NAME }}-${{ needs.create-release.outputs.release_tag }}-${{ runner.os }}${{ matrix.os == 'windows-latest' && '.zip' || '.tar.gz' }}
+          asset_name: ${{ env.BINARY_NAME }}-${{ needs.create-release.outputs.release_tag }}-${{ runner.os }}${{ matrix.os == 'windows-latest' && '.zip' || '.tar.gz' }}
