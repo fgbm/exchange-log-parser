@@ -1,0 +1,10 @@
+---
+description: Commit rules
+globs: 
+alwaysApply: false
+---
+
+# Commit rules
+
+- Use Conventional Commits
+- Вывод на русскод языке
