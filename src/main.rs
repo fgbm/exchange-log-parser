@@ -10,20 +10,19 @@ use database::Database;
 use futures::stream::{StreamExt, TryStreamExt};
 use indicatif::{ProgressBar, ProgressStyle};
 use log::{error, info};
-use models::LogType;
-use parser::LogParser;
-use walkdir::WalkDir;
+use parser::{LogParser, ParsedLog};
 use std::sync::Arc;
+use walkdir::WalkDir;
 
 const MAX_CONCURRENT_FILES: usize = 10; // Ограничение на количество одновременно обрабатываемых файлов
 
 /// Main function
-/// 
+///
 /// This function is the entry point of the program.
 /// It parses the command line arguments, initializes the database connection, and processes the log files.
-/// 
+///
 /// ### Arguments
-/// 
+///
 /// - `--logs-dir`: The directory containing the log files.
 /// - `--db-host`: The host of the database.
 /// - `--db-port`: The port of the database.
@@ -38,13 +37,16 @@ async fn main() -> Result<()> {
     let args = Args::parse();
 
     // Initialize database connection
-    let db = Arc::new(Database::new(
-        &args.db_host,
-        args.db_port,
-        &args.db_user,
-        &args.db_password,
-        &args.db_name,
-    ).await?);
+    let db = Arc::new(
+        Database::new(
+            &args.db_host,
+            args.db_port,
+            &args.db_user,
+            &args.db_password,
+            &args.db_name,
+        )
+        .await?,
+    );
 
     info!(
         "Starting to process log files in {}",
@@ -76,59 +78,44 @@ async fn main() -> Result<()> {
                 let path = entry.path();
                 pb_clone.set_message(format!("Processing {}", path.display()));
 
-                match LogParser::detect_log_type(path) {
-                    Ok(LogType::SmtpReceive) => {
-                        match LogParser::parse_smtp_receive_log(path) {
-                            Ok(logs) => {
-                                if !logs.is_empty() {
-                                    if let Err(e) = db_clone.insert_smtp_receive_logs(logs).await {
-                                        error!("Error inserting SMTP Receive logs for {}: {}", path.display(), e);
-                                    }
+                match LogParser::parse_log_file(path) {
+                    Ok(parsed_log) => match parsed_log {
+                        ParsedLog::SmtpReceive(logs) => {
+                            if !logs.is_empty() {
+                                if let Err(e) = db_clone.insert_smtp_receive_logs(logs).await {
+                                    error!(
+                                        "Error inserting SMTP Receive logs for {}: {}",
+                                        path.display(),
+                                        e
+                                    );
                                 }
                             }
-                            Err(e) => {
-                                error!("Error parsing SMTP Receive log {}: {}", path.display(), e);
-                            }
                         }
-                    }
-                    Ok(LogType::SmtpSend) => {
-                        match LogParser::parse_smtp_send_log(path) {
-                            Ok(logs) => {
-                                if !logs.is_empty() {
-                                    if let Err(e) = db_clone.insert_smtp_send_logs(logs).await {
-                                        error!("Error inserting SMTP Send logs for {}: {}", path.display(), e);
-                                    }
+                        ParsedLog::SmtpSend(logs) => {
+                            if !logs.is_empty() {
+                                if let Err(e) = db_clone.insert_smtp_send_logs(logs).await {
+                                    error!(
+                                        "Error inserting SMTP Send logs for {}: {}",
+                                        path.display(),
+                                        e
+                                    );
                                 }
                             }
-                            Err(e) => {
-                                error!("Error parsing SMTP Send log {}: {}", path.display(), e);
-                            }
                         }
-                    }
-                    Ok(LogType::MessageTracking) => {
-                        match LogParser::parse_message_tracking_log(path) {
-                            Ok(logs) => {
-                                if !logs.is_empty() {
-                                    if let Err(e) = db_clone.insert_message_tracking_logs(logs).await {
-                                        error!("Error inserting Message Tracking logs for {}: {}", path.display(), e);
-                                    }
+                        ParsedLog::MessageTracking(logs) => {
+                            if !logs.is_empty() {
+                                if let Err(e) = db_clone.insert_message_tracking_logs(logs).await {
+                                    error!(
+                                        "Error inserting Message Tracking logs for {}: {}",
+                                        path.display(),
+                                        e
+                                    );
                                 }
                             }
-                            Err(e) => {
-                                error!("Error parsing Message Tracking log {}: {}", path.display(), e);
-                            }
                         }
-                    }
-                    Ok(LogType::Unknown) => {
-                        // info!("Skipping file with unknown log type: {}", path.display());
-                        // Можно раскомментировать, если нужно видеть пропущенные файлы
-                    }
+                    },
                     Err(e) => {
-                        error!(
-                            "Error detecting log type for file {}: {}",
-                            path.display(),
-                            e
-                        );
+                        error!("Error processing file {}: {}", path.display(), e);
                     }
                 }
                 pb_clone.inc(1);
