@@ -3,18 +3,72 @@ description: commit rules
 globs: 
 alwaysApply: false
 ---
+# Commit Rules  
 
-# Commit rules
+## Structure  
 
-## Structure
+Commit messages must follow this format:  
 
-The commit message should be structured as follows:
+```
+<type>(<scope>): <description>  
 
-<type>: <description>
+[optional body]  
 
-[optional body]
+[optional footer]  
+```  
 
-[optional footer(s)]
+### Components  
+1. **Type** (required) – Categorizes the change.  
+2. **Scope** (optional) – Specifies the affected module, component, or file (e.g., `api`, `ui`, `auth`).  
+3. **Description** (required) – A concise summary in **English**.  
+4. **Body** (optional) – Detailed explanation if needed.  
+5. **Footer** (optional) – Metadata like `BREAKING CHANGE:` or issue references (`Closes #123`).  
+
+## Commit Types  
+
+- **feat** – New feature or enhancement.  
+- **fix** – Bug fix.  
+- **docs** – Documentation changes (README, comments, guides).  
+- **style** – Formatting, whitespace, or naming adjustments (no logic changes).  
+- **refactor** – Code restructuring without changing behavior.  
+- **perf** – Performance optimization.  
+- **ci** – CI/CD pipeline changes (GitHub Actions, Docker, etc.).  
+- **chore** – Maintenance tasks (configs, scripts, dependencies).  
+- **revert** – Reverts a previous commit.  
+- **deps** – Dependency updates (e.g., `package.json`, `requirements.txt`).  
+
+## Examples  
+
+### Basic commit:  
+```  
+fix(auth): correct token validation for expired sessions  
+```  
+
+### Commit with a body:  
+```  
+feat(api): add pagination to user list endpoint  
+
+Implements cursor-based pagination for `/api/users`.  
+Default limit set to 50 items per request.  
+```  
+
+### Breaking change:  
+```  
+refactor(database): migrate from MongoDB to PostgreSQL  
+
+BREAKING CHANGE: Removes MongoDB support. Requires config update in `database.yml`.  
+```  
+
+### Dependency update:  
+```  
+deps: upgrade React to v18.2.0  
+```  
+
+## Best Practices  
+- Keep descriptions under 50 characters.  
+- Use the imperative mood ("Add" instead of "Added").  
+- Reference issues in the footer (e.g., `Closes #45, #102`).  
+- For multi-line bodies, wrap at 72 characters.  
 
 ## Language
 
