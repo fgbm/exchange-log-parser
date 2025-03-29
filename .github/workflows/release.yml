@@ -25,19 +25,14 @@ jobs:
         with:
           fetch-depth: 0 # Needed for git-cliff to analyze history
 
-      - name: Install git-cliff
-        run: |
-          # Downloads the static linux binary
-          wget https://github.com/orhun/git-cliff/releases/latest/download/git-cliff-x86_64-unknown-linux-musl.tar.gz
-          tar -xzf git-cliff-x86_64-unknown-linux-musl.tar.gz
-          # Add git-cliff to the path
-          echo "$PWD/git-cliff-*/" >> $GITHUB_PATH
-        shell: bash
-
-      - name: Generate Changelog
-        # Generates changelog only for the latest tag, strips the header, outputs to file
-        run: git-cliff --latest --strip header -o CHANGELOG.md
-        shell: bash
+      - name: Generate Changelog using git-cliff action
+        uses: orhun/git-cliff-action@v3
+        with:
+          # Arguments passed to git-cliff command
+          args: --latest --strip header -o CHANGELOG.md
+        # Optional: Define environment variables if needed by git-cliff or your config
+        # env:
+        #   SOME_VAR: value
 
       - name: Get tag name
         id: get_tag
