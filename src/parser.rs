@@ -60,33 +60,33 @@ impl LogParser {
         Ok(LogType::Unknown)
     }
 
-    pub fn parse_log_file(file_path: &Path) -> Result<Vec<Box<dyn std::any::Any>>> {
-        let log_type = Self::detect_log_type(file_path)?;
-        match log_type {
-            LogType::SmtpReceive => {
-                let logs = Self::parse_smtp_receive_log(file_path)?;
-                Ok(logs
-                    .into_iter()
-                    .map(|log| Box::new(log) as Box<dyn std::any::Any>)
-                    .collect())
-            }
-            LogType::SmtpSend => {
-                let logs = Self::parse_smtp_send_log(file_path)?;
-                Ok(logs
-                    .into_iter()
-                    .map(|log| Box::new(log) as Box<dyn std::any::Any>)
-                    .collect())
-            }
-            LogType::MessageTracking => {
-                let logs = Self::parse_message_tracking_log(file_path)?;
-                Ok(logs
-                    .into_iter()
-                    .map(|log| Box::new(log) as Box<dyn std::any::Any>)
-                    .collect())
-            }
-            LogType::Unknown => Err(eyre!("Unknown log type in file: {}", file_path.display())),
-        }
-    }
+    // pub fn parse_log_file(file_path: &Path) -> Result<Vec<Box<dyn std::any::Any>>> {
+    //     let log_type = Self::detect_log_type(file_path)?;
+    //     match log_type {
+    //         LogType::SmtpReceive => {
+    //             let logs = Self::parse_smtp_receive_log(file_path)?;
+    //             Ok(logs
+    //                 .into_iter()
+    //                 .map(|log| Box::new(log) as Box<dyn std::any::Any>)
+    //                 .collect())
+    //         }
+    //         LogType::SmtpSend => {
+    //             let logs = Self::parse_smtp_send_log(file_path)?;
+    //             Ok(logs
+    //                 .into_iter()
+    //                 .map(|log| Box::new(log) as Box<dyn std::any::Any>)
+    //                 .collect())
+    //         }
+    //         LogType::MessageTracking => {
+    //             let logs = Self::parse_message_tracking_log(file_path)?;
+    //             Ok(logs
+    //                 .into_iter()
+    //                 .map(|log| Box::new(log) as Box<dyn std::any::Any>)
+    //                 .collect())
+    //         }
+    //         LogType::Unknown => Err(eyre!("Unknown log type in file: {}", file_path.display())),
+    //     }
+    // }
 
     pub fn parse_smtp_receive_log(file_path: &Path) -> Result<Vec<SmtpReceiveLog>> {
         let file = File::open(file_path)?;
