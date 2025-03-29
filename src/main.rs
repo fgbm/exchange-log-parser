@@ -108,7 +108,7 @@ fn print_statistics(
 ///
 /// ### Arguments
 ///
-/// - `--logs-dir`: The directory containing the log files.
+/// - `[logs_dir]`: The directory containing the log files (default: current directory).
 /// - `--db-host`: The host of the database.
 /// - `--db-port`: The port of the database.
 /// - `--db-user`: The user of the database.

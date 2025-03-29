@@ -60,17 +60,17 @@ irm -useb https://raw.githubusercontent.com/fgbm/exchange-log-parser/main/instal
 Запустите приложение, указав необходимые параметры:
 
 ```bash
-exchange-log-parser --logs-dir <путь_к_папке_с_логами> \
-                    --db-host <хост_бд> \
+exchange-log-parser --db-host <хост_бд> \
                     --db-port <порт_бд> \
                     --db-user <пользователь_бд> \
                     --db-password <пароль_бд> \
-                    --db-name <имя_бд>
+                    --db-name <имя_бд> \
+                    <путь_к_папке_с_логами>
 ```
 
 ### Аргументы командной строки
 
-*   `--logs-dir` (обязательный): Путь к директории, содержащей лог-файлы Exchange. Программа рекурсивно обойдет эту директорию.
+*   `[logs_dir]` (по умолчанию: текущая директория): Путь к директории, содержащей лог-файлы Exchange. Программа рекурсивно обойдет эту директорию.
 *   `--db-host`: Адрес хоста сервера PostgreSQL (по умолчанию: `localhost`).
 *   `--db-port`: Порт сервера PostgreSQL (по умолчанию: `5432`).
 *   `--db-user`: Имя пользователя для подключения к PostgreSQL (по умолчанию: `postgres`).
@@ -80,12 +80,12 @@ exchange-log-parser --logs-dir <путь_к_папке_с_логами> \
 **Пример:**
 
 ```bash
-exchange-log-parser --logs-dir "/mnt/exchange_logs" \
-                    --db-host "192.168.1.10" \
+exchange-log-parser --db-host "192.168.1.10" \
                     --db-port 5432 \
                     --db-user "exchange_user" \
                     --db-password "secret_password" \
-                    --db-name "exchange_log_db"
+                    --db-name "exchange_log_db" \
+                    "/mnt/exchange_logs"
 ```
 
 ## Схема базы данных

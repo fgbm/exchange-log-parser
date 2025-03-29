@@ -14,7 +14,7 @@ use std::path::PathBuf;
 #[command(author, version, about, long_about = None)]
 pub struct Args {
     /// Directory containing log files
-    #[arg(short, long)]
+    #[arg(default_value = ".")]
     pub logs_dir: PathBuf,
 
     /// PostgreSQL host
