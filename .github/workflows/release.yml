@@ -46,35 +46,43 @@ jobs:
           draft: false
           prerelease: false
 
-  build-release-assets:
-    name: Build Release Assets
-    needs: create-release
+  build-and-release:
+    name: Build and Release
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-    runs-on: ${{ matrix.os }}
+        include:
+          - os: ubuntu-latest
+            artifact_name: ${{ env.BINARY_NAME }}
+            asset_name: ${{ env.BINARY_NAME }}-linux-amd64
+          - os: windows-latest
+            artifact_name: ${{ env.BINARY_NAME }}.exe
+            asset_name: ${{ env.BINARY_NAME }}-windows-amd64.exe
+          - os: macos-latest
+            artifact_name: ${{ env.BINARY_NAME }}
+            asset_name: ${{ env.BINARY_NAME }}-macos-amd64
+
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v3
 
-      - uses: dtolnay/rust-toolchain@stable
-
-      - name: Build binary
-        run: cargo build --release
-
-      - name: Prepare artifact
-        run: |
-          if [ "${{ matrix.os }}" == "windows-latest" ]; then
-            7z a ${{ env.BINARY_NAME }}-${{ needs.create-release.outputs.release_tag }}-${{ runner.os }}.zip target/release/${{ env.BINARY_NAME }}.exe
-          else
-            tar czvf ${{ env.BINARY_NAME }}-${{ needs.create-release.outputs.release_tag }}-${{ runner.os }}.tar.gz -C target/release ${{ env.BINARY_NAME }}
-          fi
-
-      - name: Upload Release Asset
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
         with:
-          upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: ${{ env.BINARY_NAME }}-${{ needs.create-release.outputs.release_tag }}-${{ runner.os }}${{ matrix.os == 'windows-latest' && '.zip' || '.tar.gz' }}
-          asset_name: ${{ env.BINARY_NAME }}-${{ needs.create-release.outputs.release_tag }}-${{ runner.os }}${{ matrix.os == 'windows-latest' && '.zip' || '.tar.gz' }}
-          asset_content_type: ${{ matrix.os == 'windows-latest' && 'application/zip' || 'application/gzip' }}
+          profile: minimal
+          toolchain: stable
+          override: true
+
+      - name: Build
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --release
+
+      - name: Upload binaries to release
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: target/release/${{ matrix.artifact_name }}
+          asset_name: ${{ matrix.asset_name }}
+          tag: ${{ github.ref }}
+          overwrite: true
