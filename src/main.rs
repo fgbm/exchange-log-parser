@@ -7,11 +7,15 @@ use clap::Parser;
 use color_eyre::eyre::Result;
 use config::Args;
 use database::Database;
+use futures::stream::{StreamExt, TryStreamExt};
 use indicatif::{ProgressBar, ProgressStyle};
 use log::{error, info};
 use models::LogType;
 use parser::LogParser;
 use walkdir::WalkDir;
+use std::sync::Arc;
+
+const MAX_CONCURRENT_FILES: usize = 10; // Ограничение на количество одновременно обрабатываемых файлов
 
 /// Main function
 /// 
@@ -34,96 +38,106 @@ async fn main() -> Result<()> {
     let args = Args::parse();
 
     // Initialize database connection
-    let db = Database::new(
+    let db = Arc::new(Database::new(
         &args.db_host,
         args.db_port,
         &args.db_user,
         &args.db_password,
         &args.db_name,
-    )
-    .await?;
+    ).await?);
 
     info!(
         "Starting to process log files in {}",
         args.logs_dir.display()
     );
 
-    // Count files for progress bar
-    let total_files = WalkDir::new(&args.logs_dir)
+    // Собираем список файлов для обработки
+    let files_to_process: Vec<_> = WalkDir::new(&args.logs_dir)
         .into_iter()
         .filter_map(|e| e.ok())
         .filter(|e| e.path().is_file())
-        .count() as u64;
+        .collect();
 
-    let pb = ProgressBar::new(total_files);
+    let total_files = files_to_process.len() as u64;
+    let pb = Arc::new(ProgressBar::new(total_files)); // Используем Arc для ProgressBar
     pb.set_style(
         ProgressStyle::default_bar()
-            .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} ({percent}%)")
+            .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} ({percent}%) {msg}")
             .expect("Failed to set progress bar style")
             .progress_chars("##-"),
     );
 
-    // Process all files in the directory
-    for entry in WalkDir::new(&args.logs_dir)
-        .into_iter()
-        .filter_map(|e| e.ok())
-    {
-        let path = entry.path();
+    // Обрабатываем файлы параллельно
+    futures::stream::iter(files_to_process)
+        .map(|entry| {
+            let db_clone = Arc::clone(&db);
+            let pb_clone = Arc::clone(&pb);
+            async move {
+                let path = entry.path();
+                pb_clone.set_message(format!("Processing {}", path.display()));
 
-        if path.is_file() {
-            pb.set_message(format!("Processing {}", path.display()));
-
-            match LogParser::detect_log_type(path) {
-                Ok(LogType::SmtpReceive) => {
-                    match LogParser::parse_smtp_receive_log(path) {
-                        Ok(logs) => {
-                            if let Err(e) = db.insert_smtp_receive_logs(logs).await {
-                                error!("Error inserting SMTP Receive logs for {}: {}", path.display(), e);
+                match LogParser::detect_log_type(path) {
+                    Ok(LogType::SmtpReceive) => {
+                        match LogParser::parse_smtp_receive_log(path) {
+                            Ok(logs) => {
+                                if !logs.is_empty() {
+                                    if let Err(e) = db_clone.insert_smtp_receive_logs(logs).await {
+                                        error!("Error inserting SMTP Receive logs for {}: {}", path.display(), e);
+                                    }
+                                }
+                            }
+                            Err(e) => {
+                                error!("Error parsing SMTP Receive log {}: {}", path.display(), e);
                             }
                         }
-                        Err(e) => {
-                            error!("Error parsing SMTP Receive log {}: {}", path.display(), e);
-                        }
                     }
-                }
-                Ok(LogType::SmtpSend) => {
-                    match LogParser::parse_smtp_send_log(path) {
-                        Ok(logs) => {
-                            if let Err(e) = db.insert_smtp_send_logs(logs).await {
-                                error!("Error inserting SMTP Send logs for {}: {}", path.display(), e);
+                    Ok(LogType::SmtpSend) => {
+                        match LogParser::parse_smtp_send_log(path) {
+                            Ok(logs) => {
+                                if !logs.is_empty() {
+                                    if let Err(e) = db_clone.insert_smtp_send_logs(logs).await {
+                                        error!("Error inserting SMTP Send logs for {}: {}", path.display(), e);
+                                    }
+                                }
+                            }
+                            Err(e) => {
+                                error!("Error parsing SMTP Send log {}: {}", path.display(), e);
                             }
                         }
-                        Err(e) => {
-                            error!("Error parsing SMTP Send log {}: {}", path.display(), e);
-                        }
                     }
-                }
-                Ok(LogType::MessageTracking) => {
-                    match LogParser::parse_message_tracking_log(path) {
-                        Ok(logs) => {
-                            if let Err(e) = db.insert_message_tracking_logs(logs).await {
-                                error!("Error inserting Message Tracking logs for {}: {}", path.display(), e);
+                    Ok(LogType::MessageTracking) => {
+                        match LogParser::parse_message_tracking_log(path) {
+                            Ok(logs) => {
+                                if !logs.is_empty() {
+                                    if let Err(e) = db_clone.insert_message_tracking_logs(logs).await {
+                                        error!("Error inserting Message Tracking logs for {}: {}", path.display(), e);
+                                    }
+                                }
+                            }
+                            Err(e) => {
+                                error!("Error parsing Message Tracking log {}: {}", path.display(), e);
                             }
                         }
-                        Err(e) => {
-                            error!("Error parsing Message Tracking log {}: {}", path.display(), e);
-                        }
+                    }
+                    Ok(LogType::Unknown) => {
+                        // info!("Skipping file with unknown log type: {}", path.display());
+                        // Можно раскомментировать, если нужно видеть пропущенные файлы
+                    }
+                    Err(e) => {
+                        error!(
+                            "Error detecting log type for file {}: {}",
+                            path.display(),
+                            e
+                        );
                     }
                 }
-                Ok(LogType::Unknown) => {
-                    info!("Skipping file with unknown log type: {}", path.display());
-                }
-                Err(e) => {
-                    error!(
-                        "Error detecting log type for file {}: {}",
-                        path.display(),
-                        e
-                    );
-                }
+                pb_clone.inc(1);
+                Ok::<(), color_eyre::eyre::Error>(())
             }
-            pb.inc(1);
-        }
-    }
+        })
+        .buffer_unordered(MAX_CONCURRENT_FILES) // Запускаем задачи параллельно
+        .try_collect::<()>() // Собираем результаты (ждем завершения)
+        .await?; // Обрабатываем возможную ошибку из потока
 
     pb.finish_with_message("Log processing completed");
     Ok(())
