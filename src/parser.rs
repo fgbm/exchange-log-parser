@@ -1,4 +1,4 @@
-use crate::models::{LogType, MessageTrackingLog, PgDateTime, SmtpReceiveLog, SmtpSendLog};
+use crate::models::{LogType, MessageTrackingLog, SmtpReceiveLog, SmtpSendLog};
 use chrono::{DateTime, Utc};
 use color_eyre::eyre::{Result, eyre};
 use encoding_rs::WINDOWS_1251;
@@ -156,7 +156,7 @@ impl LogParser {
                         .entry(session_id.clone())
                         .or_insert_with(|| SmtpReceiveLog {
                             id: None,
-                            date_time: PgDateTime(date_time),
+                            date_time,
                             connector_id: connector_id.clone(),
                             session_id: session_id.clone(),
                             sequence_number,
@@ -285,7 +285,7 @@ impl LogParser {
                     .entry(session_id.clone())
                     .or_insert_with(|| SmtpSendLog {
                         id: None,
-                        date_time: PgDateTime(date_time),
+                        date_time,
                         connector_id: connector_id.clone(),
                         session_id: session_id.clone(),
                         sequence_number,
@@ -419,7 +419,7 @@ impl LogParser {
 
                 let log = MessageTrackingLog {
                     id: None,
-                    date_time: PgDateTime(date_time),
+                    date_time,
                     client_ip: get_field("client-ip"),
                     client_hostname: get_field("client-hostname"),
                     server_ip: get_field("server-ip"),

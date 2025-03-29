@@ -5,47 +5,6 @@ use postgres_types::Type;
 use bytes::BytesMut;
 use color_eyre::eyre::eyre;
 
-/// PostgreSQL date time type
-/// 
-/// This struct is used to represent a date time in PostgreSQL.
-/// 
-/// ### Examples
-/// 
-/// ```
-/// let date_time = PgDateTime(DateTime::from_utc(NaiveDateTime::from_timestamp(1717027200, 0), Utc));
-/// ```
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct PgDateTime(pub DateTime<Utc>);
-
-impl ToSql for PgDateTime {
-    fn to_sql(&self, _ty: &Type, out: &mut BytesMut) -> Result<postgres_types::IsNull, Box<dyn std::error::Error + Sync + Send>> {
-        let timestamp = self.0.timestamp();
-        out.extend_from_slice(&timestamp.to_be_bytes());
-        Ok(postgres_types::IsNull::No)
-    }
-
-    fn accepts(_ty: &Type) -> bool {
-        true
-    }
-
-    fn to_sql_checked(&self, _ty: &Type, out: &mut BytesMut) -> Result<postgres_types::IsNull, Box<dyn std::error::Error + Sync + Send>> {
-        self.to_sql(_ty, out)
-    }
-}
-
-impl FromSql<'_> for PgDateTime {
-    fn from_sql(_ty: &Type, raw: &[u8]) -> Result<Self, Box<dyn std::error::Error + Sync + Send>> {
-        let timestamp = i64::from_be_bytes(raw.try_into()?);
-        let date_time = DateTime::from_timestamp(timestamp, 0)
-            .ok_or_else(|| eyre!("Invalid timestamp"))?;
-        Ok(PgDateTime(date_time))
-    }
-
-    fn accepts(_ty: &Type) -> bool {
-        true
-    }
-}
-
 /// SMTP Receive log
 /// 
 /// This struct is used to represent a SMTP Receive log.
@@ -55,7 +14,7 @@ impl FromSql<'_> for PgDateTime {
 /// ```
 /// let log = SmtpReceiveLog {
 ///     id: None,
-///     date_time: PgDateTime(DateTime::from_utc(NaiveDateTime::from_timestamp(1717027200, 0), Utc)),
+///     date_time: Utc::now(),
 ///     connector_id: "123".to_string(),
 ///     session_id: "456".to_string(),
 ///     sequence_number: 1,
@@ -71,10 +30,10 @@ impl FromSql<'_> for PgDateTime {
 ///     size: None,
 /// };
 /// ```
-#[derive(Debug, Serialize, Deserialize, ToSql, FromSql, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SmtpReceiveLog {
     pub id: Option<i32>,
-    pub date_time: PgDateTime,
+    pub date_time: DateTime<Utc>,
     pub connector_id: String,
     pub session_id: String,
     pub sequence_number: i32,
@@ -99,7 +58,7 @@ pub struct SmtpReceiveLog {
 /// ```
 /// let log = SmtpSendLog {
 ///     id: None,
-///     date_time: PgDateTime(DateTime::from_utc(NaiveDateTime::from_timestamp(1717027200, 0), Utc)),
+///     date_time: Utc::now(),
 ///     connector_id: "123".to_string(),
 ///     session_id: "456".to_string(),
 ///     sequence_number: 1,
@@ -115,10 +74,10 @@ pub struct SmtpReceiveLog {
 ///     record_id: None,
 /// };
 /// ```
-#[derive(Debug, Serialize, Deserialize, ToSql, FromSql, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SmtpSendLog {
     pub id: Option<i32>,
-    pub date_time: PgDateTime,
+    pub date_time: DateTime<Utc>,
     pub connector_id: String,
     pub session_id: String,
     pub sequence_number: i32,
@@ -143,7 +102,7 @@ pub struct SmtpSendLog {
 /// ```
 /// let log = MessageTrackingLog {
 ///     id: None,
-///     date_time: PgDateTime(DateTime::from_utc(NaiveDateTime::from_timestamp(1717027200, 0), Utc)),
+///     date_time: Utc::now(),
 ///     client_ip: None,
 ///     client_hostname: None,
 ///     server_ip: None,
@@ -175,10 +134,10 @@ pub struct SmtpSendLog {
 ///     schema_version: None,
 /// };
 /// ```
-#[derive(Debug, Serialize, Deserialize, ToSql, FromSql, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct MessageTrackingLog {
     pub id: Option<i32>,
-    pub date_time: PgDateTime,
+    pub date_time: DateTime<Utc>,
     pub client_ip: Option<String>,
     pub client_hostname: Option<String>,
     pub server_ip: Option<String>,
