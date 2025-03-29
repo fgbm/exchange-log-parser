@@ -28,7 +28,7 @@ jobs:
         uses: orhun/git-cliff-action@v3
         with:
           config: cliff.toml
-          args: --verbose
+          args: --verbose --strip header
         env:
           GITHUB_REPO: ${{ github.repository }}
 
@@ -71,6 +71,8 @@ jobs:
 
       - name: Upload Release Asset
         uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ needs.create-release.outputs.upload_url }}
           asset_path: ${{ env.BINARY_NAME }}-${{ needs.create-release.outputs.release_tag }}-${{ runner.os }}${{ matrix.os == 'windows-latest' && '.zip' || '.tar.gz' }}
