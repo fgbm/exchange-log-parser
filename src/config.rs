@@ -36,4 +36,8 @@ pub struct Args {
     /// PostgreSQL database name
     #[arg(long, default_value = "exchange_logs")]
     pub db_name: String,
+
+    /// Количество параллельно обрабатываемых файлов
+    #[arg(short, long, default_value_t = 10)]
+    pub concurrent_files: usize,
 }

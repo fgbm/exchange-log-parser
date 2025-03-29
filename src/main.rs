@@ -11,10 +11,9 @@ use futures::stream::{StreamExt, TryStreamExt};
 use indicatif::{ProgressBar, ProgressStyle};
 use log::{error, info};
 use parser::{LogParser, ParsedLog};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
+use std::time::Instant;
 use walkdir::WalkDir;
-
-const MAX_CONCURRENT_FILES: usize = 10; // Ограничение на количество одновременно обрабатываемых файлов
 
 /// Main function
 ///
@@ -29,12 +28,14 @@ const MAX_CONCURRENT_FILES: usize = 10; // Ограничение на коли�
 /// - `--db-user`: The user of the database.
 /// - `--db-password`: The password of the database.
 /// - `--db-name`: The name of the database.
+/// - `--concurrent-files`: The number of files to process concurrently.
 #[tokio::main]
 async fn main() -> Result<()> {
     env_logger::init();
     color_eyre::install()?;
 
     let args = Args::parse();
+    let start_time = Instant::now();
 
     // Initialize database connection
     let db = Arc::new(
@@ -49,8 +50,9 @@ async fn main() -> Result<()> {
     );
 
     info!(
-        "Starting to process log files in {}",
-        args.logs_dir.display()
+        "Starting to process log files in {} with {} concurrent tasks",
+        args.logs_dir.display(),
+        args.concurrent_files
     );
 
     // Собираем список файлов для обработки
@@ -69,11 +71,22 @@ async fn main() -> Result<()> {
             .progress_chars("##-"),
     );
 
+    // Счетчики для отслеживания типов обработанных файлов
+    let smtp_receive_count = Arc::new(Mutex::new(0));
+    let smtp_send_count = Arc::new(Mutex::new(0));
+    let message_tracking_count = Arc::new(Mutex::new(0));
+    let error_count = Arc::new(Mutex::new(0));
+
     // Обрабатываем файлы параллельно
     futures::stream::iter(files_to_process)
         .map(|entry| {
             let db_clone = Arc::clone(&db);
             let pb_clone = Arc::clone(&pb);
+            let smtp_receive_count_clone = Arc::clone(&smtp_receive_count);
+            let smtp_send_count_clone = Arc::clone(&smtp_send_count);
+            let message_tracking_count_clone = Arc::clone(&message_tracking_count);
+            let error_count_clone = Arc::clone(&error_count);
+            
             async move {
                 let path = entry.path();
                 pb_clone.set_message(format!("Processing {}", path.display()));
@@ -88,6 +101,11 @@ async fn main() -> Result<()> {
                                         path.display(),
                                         e
                                     );
+                                    let mut count = error_count_clone.lock().unwrap();
+                                    *count += 1;
+                                } else {
+                                    let mut count = smtp_receive_count_clone.lock().unwrap();
+                                    *count += 1;
                                 }
                             }
                         }
@@ -99,6 +117,11 @@ async fn main() -> Result<()> {
                                         path.display(),
                                         e
                                     );
+                                    let mut count = error_count_clone.lock().unwrap();
+                                    *count += 1;
+                                } else {
+                                    let mut count = smtp_send_count_clone.lock().unwrap();
+                                    *count += 1;
                                 }
                             }
                         }
@@ -110,22 +133,48 @@ async fn main() -> Result<()> {
                                         path.display(),
                                         e
                                     );
+                                    let mut count = error_count_clone.lock().unwrap();
+                                    *count += 1;
+                                } else {
+                                    let mut count = message_tracking_count_clone.lock().unwrap();
+                                    *count += 1;
                                 }
                             }
                         }
                     },
                     Err(e) => {
                         error!("Error processing file {}: {}", path.display(), e);
+                        let mut count = error_count_clone.lock().unwrap();
+                        *count += 1;
                     }
                 }
                 pb_clone.inc(1);
                 Ok::<(), color_eyre::eyre::Error>(())
             }
         })
-        .buffer_unordered(MAX_CONCURRENT_FILES) // Запускаем задачи параллельно
+        .buffer_unordered(args.concurrent_files) // Используем значение из аргументов
         .try_collect::<()>() // Собираем результаты (ждем завершения)
         .await?; // Обрабатываем возможную ошибку из потока
 
     pb.finish_with_message("Log processing completed");
+    
+    let duration = start_time.elapsed();
+    let files_per_second = total_files as f64 / duration.as_secs_f64();
+    
+    info!(
+        "Processed {} files in {:.2} seconds ({:.2} files/sec)",
+        total_files, 
+        duration.as_secs_f64(),
+        files_per_second
+    );
+    
+    info!(
+        "Processing statistics: SMTP Receive: {}, SMTP Send: {}, Message Tracking: {}, Errors: {}",
+        *smtp_receive_count.lock().unwrap(),
+        *smtp_send_count.lock().unwrap(),
+        *message_tracking_count.lock().unwrap(),
+        *error_count.lock().unwrap()
+    );
+    
     Ok(())
 }
