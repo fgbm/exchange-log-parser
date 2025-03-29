@@ -15,26 +15,34 @@ try {
         Write-Error "Не удалось получить информацию о последнем релизе"
         exit 1
     }
+    
     $version = $latestRelease.tag_name
-
-    # Поиск нужного ассета
-    $asset = $latestRelease.assets | Where-Object { $_.name -like "*windows-$arch.exe" }
-    if (-not $asset) {
-        Write-Error "Не найден подходящий файл для windows-$arch в релизе $version"
+    $downloadUrl = ($latestRelease.assets | Where-Object { $_.name -like "*windows-$arch.exe" }).browser_download_url
+    
+    if (-not $downloadUrl) {
+        Write-Error "Не найден исполняемый файл для Windows ($arch) в релизе $version"
         exit 1
     }
 
-    Write-Host "Загрузка Exchange Log Parser $version для windows-$arch..."
+    Write-Host "Загрузка Exchange Log Parser $version для Windows ($arch)..."
 
     # Создание директории для установки
     $installDir = Join-Path $env:LOCALAPPDATA "ExchangeLogParser"
     New-Item -ItemType Directory -Force -Path $installDir | Out-Null
 
-    # Загрузка исполняемого файла
+    # Загрузка файла
     $exePath = Join-Path $installDir "exchange-log-parser.exe"
-    Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $exePath
+    
+    try {
+        Invoke-WebRequest -Uri $downloadUrl -OutFile $exePath -ErrorAction Stop
+    }
+    catch {
+        Write-Error "Ошибка при загрузке файла: $_"
+        exit 1
+    }
+
     if (-not (Test-Path $exePath)) {
-        Write-Error "Не удалось загрузить файл"
+        Write-Error "Файл не был загружен"
         exit 1
     }
 
