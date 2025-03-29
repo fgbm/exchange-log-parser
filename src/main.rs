@@ -5,6 +5,7 @@ mod parser;
 
 use clap::Parser;
 use color_eyre::eyre::Result;
+use colored::Colorize;
 use config::Args;
 use database::Database;
 use futures::stream::{StreamExt, TryStreamExt};
@@ -14,6 +15,91 @@ use parser::{LogParser, ParsedLog};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 use walkdir::WalkDir;
+
+/// Макрос для обработки и вставки логов в базу данных
+macro_rules! process_logs {
+    ($db:expr, $logs:expr, $path:expr, $success_counter:expr, $error_counter:expr, $log_type:expr, $insert_method:ident) => {
+        if !$logs.is_empty() {
+            if let Err(e) = $db.$insert_method($logs).await {
+                error!(
+                    "Error inserting {} logs for {}: {}",
+                    $log_type,
+                    $path.display(),
+                    e
+                );
+                let mut count = $error_counter.lock().unwrap();
+                *count += 1;
+            } else {
+                let mut count = $success_counter.lock().unwrap();
+                *count += 1;
+            }
+        }
+    };
+}
+
+/// Макрос для форматирования текста цветом
+macro_rules! fmt {
+    (success => $text:expr) => {
+        $text.green().bold()
+    };
+    (highlight => $text:expr) => {
+        $text.yellow().bold()
+    };
+    (info => $text:expr) => {
+        $text.cyan().bold()
+    };
+    (label => $text:expr) => {
+        $text.blue()
+    };
+    (error => $text:expr) => {
+        $text.red().bold()
+    };
+    (ok => $text:expr) => {
+        $text.green()
+    };
+    (num => $value:expr) => {
+        $value.to_string().yellow()
+    };
+}
+
+/// Выводит статистику обработки логов в консоль
+fn print_statistics(
+    total_files: u64,
+    duration: std::time::Duration,
+    smtp_receive: usize,
+    smtp_send: usize,
+    message_tracking: usize,
+    errors: usize,
+) {
+    let files_per_second = total_files as f64 / duration.as_secs_f64();
+    
+    println!(
+        "\n\n{} {} {} {} {:.2} {} ({:.2} {})",
+        fmt!(success => "✓"),
+        fmt!(success => "Обработано"),
+        fmt!(highlight => total_files.to_string()),
+        fmt!(success => "файлов за"),
+        duration.as_secs_f64(),
+        fmt!(success => "секунд"),
+        files_per_second,
+        fmt!(success => "файлов/сек")
+    );
+
+    println!(
+        "\n{} {}",
+        "📊".bold(),
+        fmt!(info => "Статистика обработки:")
+    );
+    println!("  {} {}", fmt!(label => "SMTP Receive:"), fmt!(num => smtp_receive));
+    println!("  {} {}", fmt!(label => "SMTP Send:"), fmt!(num => smtp_send));
+    println!("  {} {}", fmt!(label => "Message Tracking:"), fmt!(num => message_tracking));
+    
+    if errors > 0 {
+        println!("  {} {}", fmt!(error => "Ошибки:"), fmt!(error => errors.to_string()));
+    } else {
+        println!("  {} {}", fmt!(ok => "Ошибки:"), fmt!(ok => "0"));
+    }
+}
 
 /// Main function
 ///
@@ -86,7 +172,7 @@ async fn main() -> Result<()> {
             let smtp_send_count_clone = Arc::clone(&smtp_send_count);
             let message_tracking_count_clone = Arc::clone(&message_tracking_count);
             let error_count_clone = Arc::clone(&error_count);
-            
+
             async move {
                 let path = entry.path();
                 pb_clone.set_message(format!("Processing {}", path.display()));
@@ -94,52 +180,37 @@ async fn main() -> Result<()> {
                 match LogParser::parse_log_file(path) {
                     Ok(parsed_log) => match parsed_log {
                         ParsedLog::SmtpReceive(logs) => {
-                            if !logs.is_empty() {
-                                if let Err(e) = db_clone.insert_smtp_receive_logs(logs).await {
-                                    error!(
-                                        "Error inserting SMTP Receive logs for {}: {}",
-                                        path.display(),
-                                        e
-                                    );
-                                    let mut count = error_count_clone.lock().unwrap();
-                                    *count += 1;
-                                } else {
-                                    let mut count = smtp_receive_count_clone.lock().unwrap();
-                                    *count += 1;
-                                }
-                            }
+                            process_logs!(
+                                db_clone,
+                                logs,
+                                path,
+                                smtp_receive_count_clone,
+                                error_count_clone,
+                                "SMTP Receive",
+                                insert_smtp_receive_logs
+                            );
                         }
                         ParsedLog::SmtpSend(logs) => {
-                            if !logs.is_empty() {
-                                if let Err(e) = db_clone.insert_smtp_send_logs(logs).await {
-                                    error!(
-                                        "Error inserting SMTP Send logs for {}: {}",
-                                        path.display(),
-                                        e
-                                    );
-                                    let mut count = error_count_clone.lock().unwrap();
-                                    *count += 1;
-                                } else {
-                                    let mut count = smtp_send_count_clone.lock().unwrap();
-                                    *count += 1;
-                                }
-                            }
+                            process_logs!(
+                                db_clone,
+                                logs,
+                                path,
+                                smtp_send_count_clone,
+                                error_count_clone,
+                                "SMTP Send",
+                                insert_smtp_send_logs
+                            );
                         }
                         ParsedLog::MessageTracking(logs) => {
-                            if !logs.is_empty() {
-                                if let Err(e) = db_clone.insert_message_tracking_logs(logs).await {
-                                    error!(
-                                        "Error inserting Message Tracking logs for {}: {}",
-                                        path.display(),
-                                        e
-                                    );
-                                    let mut count = error_count_clone.lock().unwrap();
-                                    *count += 1;
-                                } else {
-                                    let mut count = message_tracking_count_clone.lock().unwrap();
-                                    *count += 1;
-                                }
-                            }
+                            process_logs!(
+                                db_clone,
+                                logs,
+                                path,
+                                message_tracking_count_clone,
+                                error_count_clone,
+                                "Message Tracking",
+                                insert_message_tracking_logs
+                            );
                         }
                     },
                     Err(e) => {
@@ -157,24 +228,24 @@ async fn main() -> Result<()> {
         .await?; // Обрабатываем возможную ошибку из потока
 
     pb.finish_with_message("Log processing completed");
-    
+
     let duration = start_time.elapsed();
-    let files_per_second = total_files as f64 / duration.as_secs_f64();
     
-    info!(
-        "Processed {} files in {:.2} seconds ({:.2} files/sec)",
-        total_files, 
-        duration.as_secs_f64(),
-        files_per_second
+    // Получаем значения счетчиков
+    let smtp_receive = *smtp_receive_count.lock().unwrap();
+    let smtp_send = *smtp_send_count.lock().unwrap();
+    let message_tracking = *message_tracking_count.lock().unwrap();
+    let errors = *error_count.lock().unwrap();
+    
+    // Выводим статистику
+    print_statistics(
+        total_files,
+        duration,
+        smtp_receive,
+        smtp_send,
+        message_tracking,
+        errors
     );
-    
-    info!(
-        "Processing statistics: SMTP Receive: {}, SMTP Send: {}, Message Tracking: {}, Errors: {}",
-        *smtp_receive_count.lock().unwrap(),
-        *smtp_send_count.lock().unwrap(),
-        *message_tracking_count.lock().unwrap(),
-        *error_count.lock().unwrap()
-    );
-    
+
     Ok(())
 }
