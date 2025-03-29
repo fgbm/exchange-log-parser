@@ -24,9 +24,13 @@ jobs:
           fetch-depth: 0
 
       - name: Generate Changelog
+        id: changelog
         uses: orhun/git-cliff-action@v3
         with:
-          args: --latest --strip header -o CHANGELOG.md
+          config: cliff.toml
+          args: --verbose
+        env:
+          GITHUB_REPO: ${{ github.repository }}
 
       - name: Get tag name
         id: get_tag
@@ -38,7 +42,7 @@ jobs:
         with:
           tag_name: ${{ steps.get_tag.outputs.TAG }}
           name: Release ${{ steps.get_tag.outputs.TAG }}
-          body_path: CHANGELOG.md
+          body: ${{ steps.changelog.outputs.content }}
           draft: false
           prerelease: false
 
@@ -71,3 +75,4 @@ jobs:
           upload_url: ${{ needs.create-release.outputs.upload_url }}
           asset_path: ${{ env.BINARY_NAME }}-${{ needs.create-release.outputs.release_tag }}-${{ runner.os }}${{ matrix.os == 'windows-latest' && '.zip' || '.tar.gz' }}
           asset_name: ${{ env.BINARY_NAME }}-${{ needs.create-release.outputs.release_tag }}-${{ runner.os }}${{ matrix.os == 'windows-latest' && '.zip' || '.tar.gz' }}
+          asset_content_type: ${{ matrix.os == 'windows-latest' && 'application/zip' || 'application/gzip' }}
