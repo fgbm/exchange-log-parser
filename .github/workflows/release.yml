@@ -53,14 +53,14 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
-            artifact_name: ${{ env.BINARY_NAME }}
-            asset_name: ${{ env.BINARY_NAME }}-linux-amd64
+            artifact_name: exchange-log-parser
+            asset_name: exchange-log-parser-linux-amd64
           - os: windows-latest
-            artifact_name: ${{ env.BINARY_NAME }}.exe
-            asset_name: ${{ env.BINARY_NAME }}-windows-amd64.exe
+            artifact_name: exchange-log-parser.exe
+            asset_name: exchange-log-parser-windows-amd64.exe
           - os: macos-latest
-            artifact_name: ${{ env.BINARY_NAME }}
-            asset_name: ${{ env.BINARY_NAME }}-macos-amd64
+            artifact_name: exchange-log-parser
+            asset_name: exchange-log-parser-macos-amd64
 
     steps:
       - uses: actions/checkout@v3
