@@ -7,6 +7,7 @@ use clap::Parser;
 use color_eyre::eyre::Result;
 use config::Args;
 use database::Database;
+use indicatif::{ProgressBar, ProgressStyle};
 use log::{error, info};
 use models::LogType;
 use parser::LogParser;
@@ -47,6 +48,21 @@ async fn main() -> Result<()> {
         args.logs_dir.display()
     );
 
+    // Count files for progress bar
+    let total_files = WalkDir::new(&args.logs_dir)
+        .into_iter()
+        .filter_map(|e| e.ok())
+        .filter(|e| e.path().is_file())
+        .count() as u64;
+
+    let pb = ProgressBar::new(total_files);
+    pb.set_style(
+        ProgressStyle::default_bar()
+            .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} ({percent}%)")
+            .expect("Failed to set progress bar style")
+            .progress_chars("##-"),
+    );
+
     // Process all files in the directory
     for entry in WalkDir::new(&args.logs_dir)
         .into_iter()
@@ -55,20 +71,44 @@ async fn main() -> Result<()> {
         let path = entry.path();
 
         if path.is_file() {
-            info!("Processing file: {}", path.display());
+            pb.set_message(format!("Processing {}", path.display()));
 
             match LogParser::detect_log_type(path) {
                 Ok(LogType::SmtpReceive) => {
-                    let logs = LogParser::parse_smtp_receive_log(path)?;
-                    db.insert_smtp_receive_logs(logs).await?;
+                    match LogParser::parse_smtp_receive_log(path) {
+                        Ok(logs) => {
+                            if let Err(e) = db.insert_smtp_receive_logs(logs).await {
+                                error!("Error inserting SMTP Receive logs for {}: {}", path.display(), e);
+                            }
+                        }
+                        Err(e) => {
+                            error!("Error parsing SMTP Receive log {}: {}", path.display(), e);
+                        }
+                    }
                 }
                 Ok(LogType::SmtpSend) => {
-                    let logs = LogParser::parse_smtp_send_log(path)?;
-                    db.insert_smtp_send_logs(logs).await?;
+                    match LogParser::parse_smtp_send_log(path) {
+                        Ok(logs) => {
+                            if let Err(e) = db.insert_smtp_send_logs(logs).await {
+                                error!("Error inserting SMTP Send logs for {}: {}", path.display(), e);
+                            }
+                        }
+                        Err(e) => {
+                            error!("Error parsing SMTP Send log {}: {}", path.display(), e);
+                        }
+                    }
                 }
                 Ok(LogType::MessageTracking) => {
-                    let logs = LogParser::parse_message_tracking_log(path)?;
-                    db.insert_message_tracking_logs(logs).await?;
+                    match LogParser::parse_message_tracking_log(path) {
+                        Ok(logs) => {
+                            if let Err(e) = db.insert_message_tracking_logs(logs).await {
+                                error!("Error inserting Message Tracking logs for {}: {}", path.display(), e);
+                            }
+                        }
+                        Err(e) => {
+                            error!("Error parsing Message Tracking log {}: {}", path.display(), e);
+                        }
+                    }
                 }
                 Ok(LogType::Unknown) => {
                     info!("Skipping file with unknown log type: {}", path.display());
@@ -81,9 +121,10 @@ async fn main() -> Result<()> {
                     );
                 }
             }
+            pb.inc(1);
         }
     }
 
-    info!("Log processing completed successfully");
+    pb.finish_with_message("Log processing completed");
     Ok(())
 }
