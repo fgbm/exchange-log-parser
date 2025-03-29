@@ -1,9 +1,5 @@
 use chrono::{DateTime, Utc};
-use postgres_types::{FromSql, ToSql};
 use serde::{Deserialize, Serialize};
-use postgres_types::Type;
-use bytes::BytesMut;
-use color_eyre::eyre::eyre;
 
 /// SMTP Receive log
 /// 
