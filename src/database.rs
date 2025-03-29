@@ -136,16 +136,31 @@ impl Database {
     }
     
     pub async fn insert_smtp_receive_logs(&self, logs: Vec<SmtpReceiveLog>) -> Result<u64> {
-        let client = self.pool.get().await?;
+        // Проверка на пустой вход
+        if logs.is_empty() {
+            debug!("Нет SMTP Receive логов для вставки");
+            return Ok(0);
+        }
+
+        // Получаем соединение один раз для всей операции
+        let mut client = self.pool.get().await?;
         let mut inserted_count = 0;
         
+        // Начинаем транзакцию
+        let tx = client.transaction().await?;
+        
+        // Подготавливаем statement
+        let stmt = tx.prepare(
+            "INSERT INTO smtp_receive_logs 
+            (date_time, connector_id, session_id, sequence_number, local_endpoint, remote_endpoint, 
+            event, data, context, sender, recipient, message_id, subject, size)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+            ON CONFLICT (date_time, session_id, sequence_number) DO NOTHING"
+        ).await?;
+        
         for log in logs {
-            let result = client.execute(
-                "INSERT INTO smtp_receive_logs 
-                (date_time, connector_id, session_id, sequence_number, local_endpoint, remote_endpoint, 
-                event, data, context, sender, recipient, message_id, subject, size)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
-                ON CONFLICT (date_time, session_id, sequence_number) DO NOTHING",
+            let result = tx.execute(
+                &stmt,
                 &[
                     &log.date_time, &log.connector_id, &log.session_id, &log.sequence_number,
                     &log.local_endpoint, &log.remote_endpoint, &log.event, &log.data, &log.context,
@@ -154,21 +169,40 @@ impl Database {
             ).await?;
             inserted_count += result;
         }
+        
+        // Фиксируем транзакцию
+        tx.commit().await?;
+        
         debug!("Inserted {} SMTP Receive logs", inserted_count);
         Ok(inserted_count)
     }
     
     pub async fn insert_smtp_send_logs(&self, logs: Vec<SmtpSendLog>) -> Result<u64> {
-        let client = self.pool.get().await?;
+        // Проверка на пустой вход
+        if logs.is_empty() {
+            debug!("Нет SMTP Send логов для вставки");
+            return Ok(0);
+        }
+        
+        // Получаем соединение один раз для всей операции
+        let mut client = self.pool.get().await?;
         let mut inserted_count = 0;
         
+        // Начинаем транзакцию
+        let tx = client.transaction().await?;
+        
+        // Подготавливаем statement
+        let stmt = tx.prepare(
+            "INSERT INTO smtp_send_logs 
+            (date_time, connector_id, session_id, sequence_number, local_endpoint, remote_endpoint, 
+            event, data, context, proxy_session_id, sender, recipient, message_id, record_id)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+            ON CONFLICT (date_time, session_id, sequence_number) DO NOTHING"
+        ).await?;
+        
         for log in logs {
-            let result = client.execute(
-                "INSERT INTO smtp_send_logs 
-                (date_time, connector_id, session_id, sequence_number, local_endpoint, remote_endpoint, 
-                event, data, context, proxy_session_id, sender, recipient, message_id, record_id)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
-                ON CONFLICT (date_time, session_id, sequence_number) DO NOTHING",
+            let result = tx.execute(
+                &stmt,
                 &[
                     &log.date_time, &log.connector_id, &log.session_id, &log.sequence_number,
                     &log.local_endpoint, &log.remote_endpoint, &log.event, &log.data, &log.context,
@@ -177,25 +211,44 @@ impl Database {
             ).await?;
             inserted_count += result;
         }
+        
+        // Фиксируем транзакцию
+        tx.commit().await?;
+        
         debug!("Inserted {} SMTP Send logs", inserted_count);
         Ok(inserted_count)
     }
     
     pub async fn insert_message_tracking_logs(&self, logs: Vec<MessageTrackingLog>) -> Result<u64> {
-        let client = self.pool.get().await?;
+        // Проверка на пустой вход
+        if logs.is_empty() {
+            debug!("Нет Message Tracking логов для вставки");
+            return Ok(0);
+        }
+        
+        // Получаем соединение один раз для всей операции
+        let mut client = self.pool.get().await?;
         let mut inserted_count = 0;
         
+        // Начинаем транзакцию
+        let tx = client.transaction().await?;
+        
+        // Подготавливаем statement
+        let stmt = tx.prepare(
+            "INSERT INTO message_tracking_logs 
+            (date_time, client_ip, client_hostname, server_ip, server_hostname, source_context,
+            connector_id, source, event_id, internal_message_id, message_id, network_message_id,
+            recipient_address, recipient_status, total_bytes, recipient_count, related_recipient_address,
+            reference, message_subject, sender_address, return_path, message_info, directionality,
+            tenant_id, original_client_ip, original_server_ip, custom_data, transport_traffic_type,
+            log_id, schema_version)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30)
+            ON CONFLICT (date_time, internal_message_id, recipient_address, event_id) DO NOTHING"
+        ).await?;
+        
         for log in logs {
-            let result = client.execute(
-                "INSERT INTO message_tracking_logs 
-                (date_time, client_ip, client_hostname, server_ip, server_hostname, source_context,
-                connector_id, source, event_id, internal_message_id, message_id, network_message_id,
-                recipient_address, recipient_status, total_bytes, recipient_count, related_recipient_address,
-                reference, message_subject, sender_address, return_path, message_info, directionality,
-                tenant_id, original_client_ip, original_server_ip, custom_data, transport_traffic_type,
-                log_id, schema_version)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30)
-                ON CONFLICT (date_time, internal_message_id, recipient_address, event_id) DO NOTHING",
+            let result = tx.execute(
+                &stmt,
                 &[
                     &log.date_time, &log.client_ip, &log.client_hostname, &log.server_ip, &log.server_hostname,
                     &log.source_context, &log.connector_id, &log.source, &log.event_id, &log.internal_message_id,
@@ -208,6 +261,10 @@ impl Database {
             ).await?;
             inserted_count += result;
         }
+        
+        // Фиксируем транзакцию
+        tx.commit().await?;
+        
         debug!("Inserted {} Message Tracking logs", inserted_count);
         Ok(inserted_count)
     }
