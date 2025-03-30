@@ -1,3 +1,8 @@
+![GitHub release (latest by date)](https://img.shields.io/github/v/release/fgbm/exchange-log-parser?color=blue&label=latest%20release&style=flat-square)
+![Rust](https://img.shields.io/badge/rust-1.70.0-orange?style=flat-square)
+![MIT License](https://img.shields.io/badge/license-MIT-yellowgreen?style=flat-square)
+
+
 # Exchange Log Parser
 
 Инструмент для автоматического анализа лог-файлов Microsoft Exchange Server (SMTP Receive, SMTP Send, Message Tracking) и их загрузки в базу данных PostgreSQL для удобного анализа и поиска.
