@@ -6,9 +6,9 @@ use lazy_static::lazy_static;
 use log::info;
 use regex::Regex;
 use std::collections::HashMap;
-use std::fs::File;
-use std::io::{BufReader, Read};
 use std::path::Path;
+use tokio::fs::File;
+use tokio::io::AsyncReadExt;
 
 lazy_static! {
     static ref SIZE_REGEX: Regex = Regex::new(r"SIZE=(\d+)").unwrap();
@@ -32,11 +32,10 @@ pub enum ParsedLog {
 
 impl LogParser {
     /// Reads and decodes a file with proper Windows-1251 handling
-    fn read_and_decode_file(file_path: &Path) -> Result<String> {
-        let file = File::open(file_path)?;
-        let mut reader = BufReader::new(file);
+    async fn read_and_decode_file(file_path: &Path) -> Result<String> {
+        let mut file = File::open(file_path).await?;
         let mut buffer = Vec::new();
-        reader.read_to_end(&mut buffer)?;
+        file.read_to_end(&mut buffer).await?;
 
         // Try Windows-1251 first, fallback to UTF-8
         let (cow, _, had_errors) = WINDOWS_1251.decode(&buffer);
@@ -47,8 +46,8 @@ impl LogParser {
         }
     }
 
-    pub fn detect_log_type(file_path: &Path) -> Result<LogType> {
-        let content = Self::read_and_decode_file(file_path)?;
+    pub async fn detect_log_type(file_path: &Path) -> Result<LogType> {
+        let content = Self::read_and_decode_file(file_path).await?;
 
         for line in content.lines() {
             if line.starts_with("#Log-type:") {
@@ -64,19 +63,19 @@ impl LogParser {
         Ok(LogType::Unknown)
     }
 
-    pub fn parse_log_file(file_path: &Path) -> Result<ParsedLog> {
-        let log_type = Self::detect_log_type(file_path)?;
+    pub async fn parse_log_file(file_path: &Path) -> Result<ParsedLog> {
+        let log_type = Self::detect_log_type(file_path).await?;
         match log_type {
             LogType::SmtpReceive => {
-                let logs = Self::parse_smtp_receive_log(file_path)?;
+                let logs = Self::parse_smtp_receive_log(file_path).await?;
                 Ok(ParsedLog::SmtpReceive(logs))
             }
             LogType::SmtpSend => {
-                let logs = Self::parse_smtp_send_log(file_path)?;
+                let logs = Self::parse_smtp_send_log(file_path).await?;
                 Ok(ParsedLog::SmtpSend(logs))
             }
             LogType::MessageTracking => {
-                let logs = Self::parse_message_tracking_log(file_path)?;
+                let logs = Self::parse_message_tracking_log(file_path).await?;
                 Ok(ParsedLog::MessageTracking(logs))
             }
             LogType::Unknown => Err(eyre!("Unknown log type in file: {}", file_path.display())),
@@ -136,8 +135,8 @@ impl LogParser {
         ))
     }
 
-    pub fn parse_smtp_receive_log(file_path: &Path) -> Result<Vec<SmtpReceiveLog>> {
-        let content = Self::read_and_decode_file(file_path)?;
+    pub async fn parse_smtp_receive_log(file_path: &Path) -> Result<Vec<SmtpReceiveLog>> {
+        let content = Self::read_and_decode_file(file_path).await?;
         let mut fields_indices: Option<HashMap<String, usize>> = None;
         let mut session_data: HashMap<String, SmtpReceiveLog> = HashMap::new();
 
@@ -226,8 +225,8 @@ impl LogParser {
         Ok(logs)
     }
 
-    pub fn parse_smtp_send_log(file_path: &Path) -> Result<Vec<SmtpSendLog>> {
-        let content = Self::read_and_decode_file(file_path)?;
+    pub async fn parse_smtp_send_log(file_path: &Path) -> Result<Vec<SmtpSendLog>> {
+        let content = Self::read_and_decode_file(file_path).await?;
         let mut fields_indices: Option<HashMap<String, usize>> = None;
         let mut session_data: HashMap<String, SmtpSendLog> = HashMap::new();
 
@@ -323,8 +322,8 @@ impl LogParser {
         Ok(logs)
     }
 
-    pub fn parse_message_tracking_log(file_path: &Path) -> Result<Vec<MessageTrackingLog>> {
-        let content = Self::read_and_decode_file(file_path)?;
+    pub async fn parse_message_tracking_log(file_path: &Path) -> Result<Vec<MessageTrackingLog>> {
+        let content = Self::read_and_decode_file(file_path).await?;
         let mut logs = Vec::new();
         let mut fields_indices: Option<HashMap<String, usize>> = None;
 

@@ -177,7 +177,7 @@ async fn main() -> Result<()> {
                 let path = entry.path();
                 pb_clone.set_message(format!("Processing {}", path.display()));
 
-                match LogParser::parse_log_file(path) {
+                match LogParser::parse_log_file(path).await {
                     Ok(parsed_log) => match parsed_log {
                         ParsedLog::SmtpReceive(logs) => {
                             process_logs!(
