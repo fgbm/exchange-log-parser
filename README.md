@@ -32,13 +32,13 @@
 
 ## Установка
 
-### Linux и macOS (одной командой)
+### Linux и macOS
 
 ```bash
 curl -sSL https://raw.githubusercontent.com/fgbm/exchange-log-parser/main/install.sh | sudo bash
 ```
 
-### Windows (одной командой)
+### Windows
 
 ```powershell
 irm -useb https://raw.githubusercontent.com/fgbm/exchange-log-parser/main/install.ps1 | iex
@@ -70,6 +70,7 @@ exchange-log-parser --db-host <хост_бд> \
                     --db-user <пользователь_бд> \
                     --db-password <пароль_бд> \
                     --db-name <имя_бд> \
+                    --concurrent-files <количество_файлов> \
                     <путь_к_папке_с_логами>
 ```
 
@@ -81,6 +82,7 @@ exchange-log-parser --db-host <хост_бд> \
 *   `--db-user`: Имя пользователя для подключения к PostgreSQL (по умолчанию: `postgres`).
 *   `--db-password`: Пароль пользователя для подключения к PostgreSQL (по умолчанию: пустая строка).
 *   `--db-name`: Имя базы данных PostgreSQL (по умолчанию: `exchange_logs`).
+*   `--concurrent-files`: Количество одновременно обрабатываемых файлов (по умолчанию: `10`).
 
 **Пример:**
 
@@ -90,6 +92,7 @@ exchange-log-parser --db-host "192.168.1.10" \
                     --db-user "exchange_user" \
                     --db-password "secret_password" \
                     --db-name "exchange_log_db" \
+                    --concurrent-files 10 \
                     "/mnt/exchange_logs"
 ```
 
