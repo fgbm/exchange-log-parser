@@ -1,3 +1,4 @@
+use crate::database::DatabaseType;
 use clap::Parser;
 use std::path::PathBuf;
 
@@ -13,35 +14,39 @@ use std::path::PathBuf;
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 pub struct Args {
-    /// Directory containing log files
+    /// Path to the directory containing log files
     #[arg(default_value = ".")]
     pub logs_dir: PathBuf,
 
-    /// PostgreSQL host
+    /// Database type (postgres or mssql)
+    #[arg(long, default_value = "postgres")]
+    pub db_type: DatabaseType,
+
+    /// Database host
     #[arg(long, default_value = "localhost")]
     pub db_host: String,
 
-    /// PostgreSQL port
+    /// Database port
     #[arg(long, default_value_t = 5432)]
     pub db_port: u16,
 
-    /// PostgreSQL username
+    /// Database username
     #[arg(long, default_value = "postgres")]
     pub db_user: String,
 
-    /// PostgreSQL password
+    /// Database password
     #[arg(long)]
     pub db_password: String,
 
-    /// PostgreSQL database name
+    /// Database name
     #[arg(long, default_value = "exchange_logs")]
     pub db_name: String,
 
-    /// Количество параллельно обрабатываемых файлов
+    /// Number of files to process concurrently
     #[arg(short, long, default_value_t = 10)]
     pub concurrent_files: usize,
 
-    /// Префикс для имен таблиц в базе данных
+    /// Table prefix
     #[arg(long)]
     pub table_prefix: Option<String>,
 }
