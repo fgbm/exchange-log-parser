@@ -2,9 +2,9 @@ use clap::Parser;
 use std::path::PathBuf;
 
 /// Command line arguments
-/// 
+///
 /// This struct is used to parse the command line arguments.
-/// 
+///
 /// ### Examples
 ///
 /// ```
@@ -40,4 +40,8 @@ pub struct Args {
     /// Количество параллельно обрабатываемых файлов
     #[arg(short, long, default_value_t = 10)]
     pub concurrent_files: usize,
+
+    /// Префикс для имен таблиц в базе данных
+    #[arg(long)]
+    pub table_prefix: Option<String>,
 }

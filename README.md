@@ -71,6 +71,7 @@ exchange-log-parser --db-host <хост_бд> \
                     --db-password <пароль_бд> \
                     --db-name <имя_бд> \
                     --concurrent-files <количество_файлов> \
+                    --table-prefix <префикс_таблиц> \
                     <путь_к_папке_с_логами>
 ```
 
@@ -83,6 +84,7 @@ exchange-log-parser --db-host <хост_бд> \
 *   `--db-password`: Пароль пользователя для подключения к PostgreSQL (по умолчанию: пустая строка).
 *   `--db-name`: Имя базы данных PostgreSQL (по умолчанию: `exchange_logs`).
 *   `--concurrent-files`: Количество одновременно обрабатываемых файлов (по умолчанию: `10`).
+*   `--table-prefix`: Префикс для имен таблиц в базе данных (опционально).
 
 **Пример:**
 
@@ -93,6 +95,7 @@ exchange-log-parser --db-host "192.168.1.10" \
                     --db-password "secret_password" \
                     --db-name "exchange_log_db" \
                     --concurrent-files 10 \
+                    --table-prefix "ex_" \
                     "/mnt/exchange_logs"
 ```
 

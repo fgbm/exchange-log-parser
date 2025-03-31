@@ -72,7 +72,7 @@ fn print_statistics(
     errors: usize,
 ) {
     let files_per_second = total_files as f64 / duration.as_secs_f64();
-    
+
     println!(
         "\n\n{} {} {} {} {:.2} {} ({:.2} {})",
         fmt!(success => "✓"),
@@ -90,12 +90,28 @@ fn print_statistics(
         "📊".bold(),
         fmt!(info => "Статистика обработки:")
     );
-    println!("  {} {}", fmt!(label => "SMTP Receive:"), fmt!(num => smtp_receive));
-    println!("  {} {}", fmt!(label => "SMTP Send:"), fmt!(num => smtp_send));
-    println!("  {} {}", fmt!(label => "Message Tracking:"), fmt!(num => message_tracking));
-    
+    println!(
+        "  {} {}",
+        fmt!(label => "SMTP Receive:"),
+        fmt!(num => smtp_receive)
+    );
+    println!(
+        "  {} {}",
+        fmt!(label => "SMTP Send:"),
+        fmt!(num => smtp_send)
+    );
+    println!(
+        "  {} {}",
+        fmt!(label => "Message Tracking:"),
+        fmt!(num => message_tracking)
+    );
+
     if errors > 0 {
-        println!("  {} {}", fmt!(error => "Ошибки:"), fmt!(error => errors.to_string()));
+        println!(
+            "  {} {}",
+            fmt!(error => "Ошибки:"),
+            fmt!(error => errors.to_string())
+        );
     } else {
         println!("  {} {}", fmt!(ok => "Ошибки:"), fmt!(ok => "0"));
     }
@@ -131,6 +147,7 @@ async fn main() -> Result<()> {
             &args.db_user,
             &args.db_password,
             &args.db_name,
+            args.table_prefix.as_deref(),
         )
         .await?,
     );
@@ -230,13 +247,13 @@ async fn main() -> Result<()> {
     pb.finish_with_message("Log processing completed");
 
     let duration = start_time.elapsed();
-    
+
     // Получаем значения счетчиков
     let smtp_receive = *smtp_receive_count.lock().unwrap();
     let smtp_send = *smtp_send_count.lock().unwrap();
     let message_tracking = *message_tracking_count.lock().unwrap();
     let errors = *error_count.lock().unwrap();
-    
+
     // Выводим статистику
     print_statistics(
         total_files,
@@ -244,7 +261,7 @@ async fn main() -> Result<()> {
         smtp_receive,
         smtp_send,
         message_tracking,
-        errors
+        errors,
     );
 
     Ok(())
