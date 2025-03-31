@@ -2,9 +2,9 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 /// SMTP Receive log
-/// 
+///
 /// This struct is used to represent a SMTP Receive log.
-/// 
+///
 /// ### Examples
 ///
 /// ```
@@ -46,9 +46,9 @@ pub struct SmtpReceiveLog {
 }
 
 /// SMTP Send log
-/// 
+///
 /// This struct is used to represent a SMTP Send log.
-/// 
+///
 /// ### Examples
 ///
 /// ```
@@ -90,9 +90,9 @@ pub struct SmtpSendLog {
 }
 
 /// Message Tracking log
-/// 
+///
 /// This struct is used to represent a Message Tracking log.
-/// 
+///
 /// ### Examples
 ///
 /// ```
@@ -166,9 +166,9 @@ pub struct MessageTrackingLog {
 }
 
 /// Log type
-/// 
+///
 /// This enum is used to represent the type of log.
-/// 
+///
 /// ### Examples
 ///
 /// ```
