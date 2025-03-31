@@ -7,7 +7,6 @@ use clap::Parser;
 use color_eyre::eyre::Result;
 use colored::Colorize;
 use config::Args;
-use database::Database;
 use futures::stream::{StreamExt, TryStreamExt};
 use indicatif::{ProgressBar, ProgressStyle};
 use log::{error, info};
@@ -121,16 +120,6 @@ fn print_statistics(
 ///
 /// This function is the entry point of the program.
 /// It parses the command line arguments, initializes the database connection, and processes the log files.
-///
-/// ### Arguments
-///
-/// - `[logs_dir]`: The directory containing the log files (default: current directory).
-/// - `--db-host`: The host of the database.
-/// - `--db-port`: The port of the database.
-/// - `--db-user`: The user of the database.
-/// - `--db-password`: The password of the database.
-/// - `--db-name`: The name of the database.
-/// - `--concurrent-files`: The number of files to process concurrently.
 #[tokio::main]
 async fn main() -> Result<()> {
     env_logger::init();
@@ -141,7 +130,8 @@ async fn main() -> Result<()> {
 
     // Initialize database connection
     let db = Arc::new(
-        Database::new(
+        database::create_database(
+            args.db_type,
             &args.db_host,
             args.db_port,
             &args.db_user,
