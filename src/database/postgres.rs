@@ -1,27 +1,18 @@
 use crate::models::{MessageTrackingLog, SmtpReceiveLog, SmtpSendLog};
+use async_trait::async_trait;
 use color_eyre::eyre::Result;
 use deadpool_postgres::{Config, Pool, Runtime};
 use log::{debug, info};
 use tokio_postgres::NoTls;
 
-pub struct Database {
+use super::Database;
+
+pub struct PostgresDatabase {
     pool: Pool,
     table_prefix: String,
 }
 
-/// Database implementation
-///
-/// This struct is used to interact with the database.
-/// It provides methods to initialize the tables and insert the logs into the database.
-///
-/// ### Examples
-///
-/// ```
-/// let db = Database::new("localhost", 5432, "postgres", "password", "exchange_logs", Some("prefix_")).await?;
-/// let logs = LogParser::parse_smtp_receive_log("path/to/log/file").await?;
-/// db.insert_smtp_receive_logs(logs).await?;
-/// ```
-impl Database {
+impl PostgresDatabase {
     pub async fn new(
         host: &str,
         port: u16,
@@ -39,7 +30,7 @@ impl Database {
 
         let pool = cfg.create_pool(Some(Runtime::Tokio1), NoTls)?;
 
-        let db = Database {
+        let db = PostgresDatabase {
             pool,
             table_prefix: table_prefix.unwrap_or("").to_string(),
         };
@@ -47,7 +38,10 @@ impl Database {
 
         Ok(db)
     }
+}
 
+#[async_trait]
+impl Database for PostgresDatabase {
     async fn init_tables(&self) -> Result<()> {
         let client = self.pool.get().await?;
 
@@ -153,21 +147,17 @@ impl Database {
         Ok(())
     }
 
-    pub async fn insert_smtp_receive_logs(&self, logs: Vec<SmtpReceiveLog>) -> Result<u64> {
-        // Проверка на пустой вход
+    async fn insert_smtp_receive_logs(&self, logs: Vec<SmtpReceiveLog>) -> Result<u64> {
         if logs.is_empty() {
             debug!("Нет SMTP Receive логов для вставки");
             return Ok(0);
         }
 
-        // Получаем соединение один раз для всей операции
         let mut client = self.pool.get().await?;
         let mut inserted_count = 0;
 
-        // Начинаем транзакцию
         let tx = client.transaction().await?;
 
-        // Подготавливаем statement
         let stmt = tx
             .prepare(&format!(
                 "INSERT INTO {prefix}smtp_receive_logs 
@@ -204,28 +194,23 @@ impl Database {
             inserted_count += result;
         }
 
-        // Фиксируем транзакцию
         tx.commit().await?;
 
         debug!("Inserted {} SMTP Receive logs", inserted_count);
         Ok(inserted_count)
     }
 
-    pub async fn insert_smtp_send_logs(&self, logs: Vec<SmtpSendLog>) -> Result<u64> {
-        // Проверка на пустой вход
+    async fn insert_smtp_send_logs(&self, logs: Vec<SmtpSendLog>) -> Result<u64> {
         if logs.is_empty() {
             debug!("Нет SMTP Send логов для вставки");
             return Ok(0);
         }
 
-        // Получаем соединение один раз для всей операции
         let mut client = self.pool.get().await?;
         let mut inserted_count = 0;
 
-        // Начинаем транзакцию
         let tx = client.transaction().await?;
 
-        // Подготавливаем statement
         let stmt = tx
             .prepare(&format!(
                 "INSERT INTO {prefix}smtp_send_logs 
@@ -262,28 +247,23 @@ impl Database {
             inserted_count += result;
         }
 
-        // Фиксируем транзакцию
         tx.commit().await?;
 
         debug!("Inserted {} SMTP Send logs", inserted_count);
         Ok(inserted_count)
     }
 
-    pub async fn insert_message_tracking_logs(&self, logs: Vec<MessageTrackingLog>) -> Result<u64> {
-        // Проверка на пустой вход
+    async fn insert_message_tracking_logs(&self, logs: Vec<MessageTrackingLog>) -> Result<u64> {
         if logs.is_empty() {
             debug!("Нет Message Tracking логов для вставки");
             return Ok(0);
         }
 
-        // Получаем соединение один раз для всей операции
         let mut client = self.pool.get().await?;
         let mut inserted_count = 0;
 
-        // Начинаем транзакцию
         let tx = client.transaction().await?;
 
-        // Подготавливаем statement
         let stmt = tx.prepare(&format!(
             "INSERT INTO {prefix}message_tracking_logs 
             (date_time, client_ip, client_hostname, server_ip, server_hostname, source_context,
@@ -338,7 +318,6 @@ impl Database {
             inserted_count += result;
         }
 
-        // Фиксируем транзакцию
         tx.commit().await?;
 
         debug!("Inserted {} Message Tracking logs", inserted_count);
